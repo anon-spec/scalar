@@ -718,6 +718,12 @@ components:
             - ice_giant
             - dwarf
             - super_earth
+          x-enumDescriptions:
+            terrestrial: A rocky planet with a solid surface, composed primarily of silicate rocks or metals (like Earth, Mars, Venus, or Mercury)
+            gas_giant: A massive planet composed mainly of hydrogen and helium with no definite surface (like Jupiter or Saturn)
+            ice_giant: A giant planet composed mainly of elements heavier than hydrogen and helium, such as oxygen, carbon, nitrogen, and sulfur (like Uranus or Neptune)
+            dwarf: A celestial body that orbits the Sun and is massive enough to be rounded by its own gravity but has not cleared its neighboring region of planetesimals (like Pluto or Eris)
+            super_earth: An extrasolar planet with a mass higher than Earth's but substantially below the mass of gas giants
           examples:
             - terrestrial
         habitabilityIndex:
@@ -860,6 +866,10 @@ components:
             - moon
             - asteroid
             - comet
+          x-enumDescriptions:
+            moon: A natural satellite that orbits a planet or minor planet, formed from the gravitational collapse of debris
+            asteroid: A minor planet of the inner Solar System, typically composed of rock and metal
+            comet: An icy small Solar System body that develops a visible atmosphere (coma) and sometimes a tail when passing close to the Sun
           examples:
             - moon
         orbit:

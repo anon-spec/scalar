@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import { build } from '@scalar/build-tooling/esbuild'
-import { normalize, toJson } from '@scalar/openapi-parser'
+import { dereference, normalize, toJson } from '@scalar/openapi-parser'
 
 await build({
   entries: ['./src/index.ts'],
@@ -27,9 +27,11 @@ await build({
     const version = fs.readFileSync('dist/3.1.yaml', 'utf-8')
     const latest = fs.readFileSync('dist/latest.yaml', 'utf-8')
 
-    // Copy the base files into JSON format as well
-    const versionOut = toJson(normalize(version))
-    const latestOut = toJson(normalize(latest))
+    // Copy the base files into JSON format as well, dereferencing $ref
+    const { schema: versionSchema } = await dereference(version)
+    const { schema: latestSchema } = await dereference(latest)
+    const versionOut = toJson(versionSchema ?? normalize(version))
+    const latestOut = toJson(latestSchema ?? normalize(latest))
 
     fs.writeFileSync('./dist/3.1.json', versionOut)
     fs.writeFileSync('./dist/latest.json', latestOut)
