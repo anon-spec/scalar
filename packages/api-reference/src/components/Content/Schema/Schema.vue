@@ -2,7 +2,7 @@
 import { Disclosure, DisclosureButton, DisclosurePanel } from '@headlessui/vue'
 import { ScalarIcon, ScalarMarkdown } from '@scalar/components'
 import type { OpenAPIV3_1 } from '@scalar/openapi-types'
-import { computed, inject } from 'vue'
+import { computed, inject, ref } from 'vue'
 
 import ScreenReader from '@/components/ScreenReader.vue'
 import type { Schemas } from '@/features/Operation/types/schemas'
@@ -108,7 +108,14 @@ const schema = computed(() => {
 })
 
 const shouldShowToggle = computed(() => {
-  if (props.noncollapsible || props.level === 0) {
+  // Allow the special "additionalProperties" one-way toggle even at level 0
+  // so that partitioned/collapsed schemas can remain design-consistent while
+  // still being hidden until the user expands them.
+  if (props.noncollapsible) {
+    return false
+  }
+
+  if (props.level === 0 && !props.additionalProperties) {
     return false
   }
 
@@ -144,6 +151,39 @@ const shouldShowDescription = computed(() => {
 
   return true
 })
+
+// Limit the number of properties shown initially for large schemas.
+// Clicking the "Show additional properties" button will reveal all properties.
+const initialPropertyLimit = 12
+const showAllProperties = ref(false)
+const propertyKeys = computed(() =>
+  schema.value && typeof schema.value === 'object' && schema.value.properties
+    ? Object.keys(schema.value.properties)
+    : [],
+)
+const visibleProperties = computed(() => {
+  // If this Schema instance represents the collapsed 'additionalProperties'
+  // section (request body partitioning), don't apply a second layer of
+  // truncation — show all properties and let the parent control collapsing.
+  if (props.additionalProperties) {
+    return propertyKeys.value
+  }
+
+  return showAllProperties.value
+    ? propertyKeys.value
+    : propertyKeys.value.slice(0, initialPropertyLimit)
+})
+
+const hasMoreProperties = computed(() => {
+  if (props.additionalProperties) {
+    return false
+  }
+  return propertyKeys.value.length > initialPropertyLimit
+})
+
+const revealAllProperties = () => {
+  showAllProperties.value = true
+}
 
 // Prevent click action if noncollapsible
 const handleClick = (e: MouseEvent) =>
@@ -246,7 +286,7 @@ const handleDiscriminatorChange = (type: string) => {
             <!-- Regular properties -->
             <template v-if="schema.properties">
               <SchemaProperty
-                v-for="property in Object.keys(schema.properties)"
+                v-for="property in visibleProperties"
                 :key="property"
                 :compact="compact"
                 :hideHeading="hideHeading"
@@ -280,6 +320,23 @@ const handleDiscriminatorChange = (type: string) => {
                 "
                 :modelValue="discriminator"
                 @update:modelValue="handleDiscriminatorChange" />
+
+              <!-- Show the 'Show additional properties' button if there are more properties than the initial limit -->
+              <div
+                v-if="hasMoreProperties && !showAllProperties"
+                class="schema-properties">
+                <button
+                  class="schema-card-title schema-card-title--compact"
+                  type="button"
+                  @click.prevent="revealAllProperties">
+                  <ScalarIcon
+                    class="schema-card-title-icon"
+                    icon="Add"
+                    size="sm" />
+                  Show additional properties
+                  <ScreenReader v-if="name">for {{ name }}</ScreenReader>
+                </button>
+              </div>
             </template>
 
             <!-- Pattern properties -->

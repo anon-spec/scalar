@@ -32,12 +32,27 @@ if (requestBody?.content) {
 /**
  * Splits schema properties into visible and collapsed sections when there are more than 12 properties.
  * Returns null for schemas with fewer properties or non-object schemas.
+ * If the schema is a $ref, attempt to resolve it using the provided `schemas` map.
  */
 const partitionedSchema = computed(() => {
-  const schema = requestBody?.content?.[selectedContentType.value]?.schema
+  let schema = requestBody?.content?.[selectedContentType.value]?.schema as any
+
+  // Resolve local $ref using the schemas prop (e.g. "#/components/schemas/Name")
+  if (
+    schema &&
+    typeof schema === 'object' &&
+    '$ref' in schema &&
+    typeof schema.$ref === 'string'
+  ) {
+    const parts = schema.$ref.split('/')
+    const name = parts[parts.length - 1]
+    if (name && (schemas as any) && (schemas as any)[name]) {
+      schema = (schemas as any)[name]
+    }
+  }
 
   // Early return if not an object schema
-  if (schema?.type !== 'object' || !schema.properties) {
+  if (!schema || schema.type !== 'object' || !schema.properties) {
     return null
   }
 
@@ -106,7 +121,8 @@ const handleDiscriminatorChange = (type: string) => {
         compact
         name="Request Body"
         :schemas="schemas"
-        :value="partitionedSchema.collapsedProperties" />
+        :value="partitionedSchema.collapsedProperties"
+        :level="0" />
     </div>
 
     <!-- Show em all 12 and under -->
@@ -118,7 +134,16 @@ const handleDiscriminatorChange = (type: string) => {
         name="Request Body"
         noncollapsible
         :schemas="schemas"
-        :value="requestBody.content?.[selectedContentType]?.schema"
+        :value="
+          requestBody.content?.[selectedContentType]?.schema &&
+          requestBody.content?.[selectedContentType]?.schema.$ref
+            ? (schemas as any)?.[
+                requestBody.content[selectedContentType].schema.$ref
+                  .split('/')
+                  .pop()
+              ]
+            : requestBody.content?.[selectedContentType]?.schema
+        "
         @update:modelValue="handleDiscriminatorChange" />
     </div>
   </div>
