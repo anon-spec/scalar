@@ -8,6 +8,7 @@ import {
   serverSchema,
 } from '@scalar/oas-utils/entities/spec'
 import { beforeAll, describe, expect, it, vi } from 'vitest'
+import { base64EncodeUtf8 } from '@/libs/base64'
 import type { z } from 'zod'
 
 import type { SelectedSecuritySchemeUids } from '@scalar/oas-utils/entities/shared'
@@ -967,7 +968,7 @@ describe('create-request-operation', () => {
         throw new Error('No data')
       }
       expect(JSON.parse(result?.response.data as string).headers).toMatchObject({
-        authorization: `Basic ${btoa('user:pass')}`,
+        authorization: `Basic ${base64EncodeUtf8('user:pass')}`,
       })
     })
 
