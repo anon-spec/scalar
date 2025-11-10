@@ -454,6 +454,23 @@ const _apiReferenceConfigurationSchema = apiClientConfigurationSchema.merge(
     operationsSorter: z
       .union([z.literal('alpha'), z.literal('method'), z.function().args(z.any(), z.any()).returns(z.number())])
       .optional(),
+    /**
+     * How to order schema properties when rendering models
+     * - If omitted, preserves the original order from the OpenAPI document
+     * - 'alpha' will sort property names alphabetically
+     * - A custom comparator function may be provided for programmatic configs (receives two property schema objects and should return a number)
+     */
+    orderSchemaPropertiesBy: z
+      .union([z.literal('alpha'), z.literal('preserve'), z.function().args(z.any(), z.any()).returns(z.number())])
+      .optional()
+      .default('alpha')
+      .catch('alpha'),
+    /**
+     * Whether to show required properties before optional ones when rendering schemas
+     * If true, required properties are placed first and both groups are sorted according to `orderSchemaPropertiesBy` when present.
+     * Defaults to false to preserve existing behavior.
+     */
+    orderRequiredPropertiesFirst: z.boolean().optional().default(true).catch(true),
   }),
 )
 

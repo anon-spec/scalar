@@ -2,10 +2,15 @@
 import { Disclosure, DisclosureButton, DisclosurePanel } from '@headlessui/vue'
 import { ScalarIcon, ScalarMarkdown } from '@scalar/components'
 import type { OpenAPIV3_1 } from '@scalar/openapi-types'
-import { computed, inject, ref } from 'vue'
+import { computed, inject, ref, watch } from 'vue'
 
 import ScreenReader from '@/components/ScreenReader.vue'
 import type { Schemas } from '@/features/Operation/types/schemas'
+import {
+  SCHEMA_ORDERING_OVERRIDE,
+  type SchemaOrderingOverride,
+} from '@/hooks/schemaOrdering'
+import { useConfig } from '@/hooks/useConfig'
 import { DISCRIMINATOR_CONTEXT } from '@/hooks/useDiscriminator'
 
 import SchemaHeading from './SchemaHeading.vue'
@@ -161,24 +166,132 @@ const propertyKeys = computed(() =>
     ? Object.keys(schema.value.properties)
     : [],
 )
+
+/**
+ * Compute a sorted list of property keys based on configuration.
+ * By default we preserve the original order unless the config requests sorting.
+ */
+const config = useConfig()
+
+// UI override values (per-page/per-component). Initialize from global config.
+// Allow an injected override (provided by the operation parameters UI) to control
+// ordering at runtime. If no override is provided, fall back to local refs.
+const injectedOrdering = inject<SchemaOrderingOverride | null>(
+  SCHEMA_ORDERING_OVERRIDE,
+  null,
+)
+
+const uiOrder = injectedOrdering
+  ? injectedOrdering.order
+  : ref<string>(config.value.orderSchemaPropertiesBy ?? 'alpha')
+const uiReqFirst = injectedOrdering
+  ? injectedOrdering.reqFirst
+  : ref<boolean>(
+      config.value.orderRequiredPropertiesFirst === undefined
+        ? true
+        : Boolean(config.value.orderRequiredPropertiesFirst),
+    )
+
+// If there is no injected override, keep ui values in sync with global config
+if (!injectedOrdering) {
+  watch(
+    () => config.value.orderSchemaPropertiesBy,
+    (v) => {
+      if (v !== undefined) uiOrder.value = v as string
+    },
+  )
+  watch(
+    () => config.value.orderRequiredPropertiesFirst,
+    (v) => {
+      if (v !== undefined) uiReqFirst.value = Boolean(v)
+    },
+  )
+}
+
+const sortedPropertyKeys = computed(() => {
+  const keys = propertyKeys.value ? propertyKeys.value.slice() : []
+
+  // Nothing to sort
+  if (!keys.length) return keys
+
+  const sorter = uiOrder.value
+  const reqFirst = Boolean(uiReqFirst.value)
+
+  // Helper for alphabetical sort by property name
+  const alphaCompare = (a: string, b: string) =>
+    a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
+
+  // Partition required/optional if requested
+  let requiredKeys: string[] = []
+  let optionalKeys: string[] = []
+  if (reqFirst && schema.value && typeof schema.value === 'object') {
+    const requiredSet = new Set(
+      Array.isArray(schema.value.required) ? schema.value.required : [],
+    )
+    for (const k of keys) {
+      if (requiredSet.has(k)) requiredKeys.push(k)
+      else optionalKeys.push(k)
+    }
+  } else {
+    requiredKeys = keys
+    optionalKeys = []
+  }
+
+  const sortGroup = (arr: string[]) => {
+    if (!arr || arr.length <= 1) return arr
+
+    // 'preserve' means keep original order
+    if (!sorter || sorter === 'preserve') return arr
+
+    try {
+      if (sorter === 'alpha') {
+        return arr.slice().sort(alphaCompare)
+      }
+
+      if (typeof sorter === 'function') {
+        // comparator receives two schema objects (if available), fallback to names
+        return arr.slice().sort((a, b) => {
+          try {
+            const left = schema.value?.properties?.[a]
+            const right = schema.value?.properties?.[b]
+            // Call user's comparator with schema objects if present
+            return (sorter as any)(left ?? a, right ?? b) as number
+          } catch (e) {
+            return alphaCompare(a, b)
+          }
+        })
+      }
+    } catch (e) {
+      // If comparator fails, fall back to alphabetical
+      return arr.slice().sort(alphaCompare)
+    }
+
+    return arr
+  }
+
+  const sortedRequired = sortGroup(requiredKeys)
+  const sortedOptional = sortGroup(optionalKeys)
+
+  return reqFirst ? [...sortedRequired, ...sortedOptional] : sortedRequired
+})
 const visibleProperties = computed(() => {
   // If this Schema instance represents the collapsed 'additionalProperties'
   // section (request body partitioning), don't apply a second layer of
   // truncation — show all properties and let the parent control collapsing.
   if (props.additionalProperties) {
-    return propertyKeys.value
+    return sortedPropertyKeys.value
   }
 
   return showAllProperties.value
-    ? propertyKeys.value
-    : propertyKeys.value.slice(0, initialPropertyLimit)
+    ? sortedPropertyKeys.value
+    : sortedPropertyKeys.value.slice(0, initialPropertyLimit)
 })
 
 const hasMoreProperties = computed(() => {
   if (props.additionalProperties) {
     return false
   }
-  return propertyKeys.value.length > initialPropertyLimit
+  return sortedPropertyKeys.value.length > initialPropertyLimit
 })
 
 const revealAllProperties = () => {
