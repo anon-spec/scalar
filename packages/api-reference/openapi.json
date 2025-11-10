@@ -31,7 +31,7 @@
   "components": {
     "schemas": {
       "TestRequest": {
-        "required": ["zebra", "alpha", "beta", "gamma"],
+        "required": ["zebra", "gamma"],
         "type": "object",
         "properties": {
           "zebra": {
