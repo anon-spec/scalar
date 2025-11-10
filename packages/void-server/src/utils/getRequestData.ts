@@ -3,6 +3,26 @@ import { getCookie } from 'hono/cookie'
 
 import { getBody } from './getBody'
 
+function decodeBase64Utf8(b64: string) {
+  try {
+    // Node environment: Buffer available
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+    return Buffer.from(b64, 'base64').toString('utf8')
+  } catch (_) {
+    try {
+      const bin = atob(b64)
+      const bytes = new Uint8Array(Array.from(bin, (c) => c.charCodeAt(0)))
+      return new TextDecoder().decode(bytes)
+    } catch (_e) {
+      try {
+        return atob(b64)
+      } catch (_e2) {
+        return ''
+      }
+    }
+  }
+}
+
 /**
  * Collect all the data from a request
  */
@@ -21,7 +41,7 @@ export async function getRequestData(c: Context) {
           authentication: {
             type: 'http.basic',
             token,
-            value: atob(token),
+            value: decodeBase64Utf8(token),
           },
         }
       }

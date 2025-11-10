@@ -37,6 +37,7 @@ import {
   EXAMPLE_CONTEXT,
 } from '@/hooks/useDiscriminator'
 import { useExampleStore } from '@/legacy/stores'
+import { base64EncodeUtf8 } from '@/libs/base64'
 import {
   useHttpClientStore,
   type HttpClientState,
@@ -244,7 +245,7 @@ const secretCredentials = computed(() =>
       return [
         scheme.token,
         scheme.password,
-        btoa(`${scheme.username}:${scheme.password}`),
+        base64EncodeUtf8(`${scheme.username}:${scheme.password}`),
       ]
     }
     if (scheme.type === 'oauth2') {
@@ -486,7 +487,7 @@ watch(discriminator, (newValue) => {
         <ExamplePicker
           class="request-example-selector"
           :examples="getExamplesFromOperation"
-          :modelValue="selectedExampleKey"
+          v-model="selectedExampleKey"
           @update:modelValue="handleExampleUpdate" />
       </div>
       <slot name="footer" />
